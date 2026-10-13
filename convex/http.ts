@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { type ActionCtx, httpAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { internal, components } from "./_generated/api";
+import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { GMAIL_SCOPE, gmailOwnerEmail, importGmail } from "./gmailClient";
 import { cookie, hmac, oauthStart, setCookie, sign, verify } from "./gmailAuth";
 import { escapeHtml, home, ledgerPage, page, reportPage } from "./gmailPage";
@@ -47,7 +48,7 @@ async function financialData(ctx: ActionCtx, accountOwner: string) {
   return { ...data, currentRows: current.rows, more: current.more };
 }
 function redirect(location: string) { return response("", 303, new Headers({ Location: location })); }
-http.route({ path: "/", method: "GET", handler: httpAction(async (ctx, request) => {
+http.route({ path: "/home", method: "GET", handler: httpAction(async (ctx, request) => {
   const accountOwner = await owner(request);
   if (!accountOwner) return response(home(Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET), false));
   const data = await financialData(ctx, accountOwner);
@@ -160,4 +161,10 @@ http.route({ path: "/gmail/ledger", method: "GET", handler: httpAction(async (ct
   } catch { return errorPage("This ledger page could not be loaded. Open the saved ledger again.", 400); }
 }) });
 
+http.route({ path: "/session", method: "GET", handler: httpAction(async (_ctx, request) => {
+  // No private data is sent to the public screen, just whether this browser is connected.
+  return new Response(null, { status: await owner(request) ? 204 : 401, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+}) });
+// Exact Gmail, salary and transaction routes take precedence over the static files.
+registerStaticRoutes(http, components.staticHosting, { spaFallback: false });
 export default http;

@@ -19,6 +19,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@convex-dev/static-hosting": "^0.2.1",
     "convex": "^1.46.0",
     "entities": "^8.1.0"
   },
