@@ -1,0 +1,31 @@
+{
+  "name": "build-sprint-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --import tsx --test tests/*.test.ts",
+    "check": "tsc --noEmit -p convex/tsconfig.json",
+    "dev": "convex dev",
+    "test:browser": "playwright test",
+    "preview": "node --import tsx scripts/preview.ts",
+    "build": "node --import tsx scripts/build.ts",
+    "setup:hosting": "node scripts/setup-hosting.mjs",
+    "deploy": "convex dev --once && static-hosting upload --build --no-spa",
+    "ship": "node scripts/ship.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "convex": "^1.46.0",
+    "entities": "^8.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,30 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import http from "../convex/http";
+import { sign, hmac } from "../convex/gmailAuth";
+import { dashboard } from "../convex/screens";
+import { spending } from "../convex/spending";
+const secret = 'screen-test-secret';
+const base = 'https://example.convex.site';
+const handler = (path:string, method:'GET'|'POST') => (http.lookup(path,method)![0] as any)._handler;
+test('salary and transaction saves require a signed session and form token', async()=>{
+ process.env.GOOGLE_CLIENT_SECRET=secret;
+ const session = await sign(secret,{purpose:'ledger-session',owner:'test-owner',expires:Date.now()+60000});
+ const csrf = await hmac(secret,`form:${session}`);
+ const writes:any[]=[];
+ const ctx = {runMutation: async(_fn:any,args:any)=>{writes.push(args);return true},runQuery:async()=>({salary:{amount:20000,date:'2026-10-01'},rows:[],more:false})};
+ const post = (path:string,values:Record<string,string>,authenticated=true)=>handler(path,'POST')(ctx,new Request(base+path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',origin:base,...(authenticated?{cookie:`__Host-finsightx_session=${session}`}:{})},body:new URLSearchParams(values)}));
+ assert.equal((await post('/salary',{amount:'20000',date:'2026-10-01',csrf},false)).status,401);
+ assert.equal((await post('/salary',{amount:'20000',date:'2026-10-01',csrf:'forged'})).status,403);
+ const invalid = await post('/salary',{amount:'',date:'',csrf});assert.equal(invalid.status,400);assert.match(await invalid.text(),/Enter the salary amount/);assert.equal(writes.length,0);
+ const salary = await post('/salary',{amount:'20000',date:'2026-10-01',csrf});assert.equal(salary.status,303);assert.equal(salary.headers.get('location'),'/?notice=salary');assert.equal(writes[0].owner,'test-owner');
+ const spend = await post('/transaction',{amount:'1000',date:'2026-10-01',payee:'Shop',kind:'spent',key:'test',csrf});assert.equal(spend.status,303);assert.equal(writes[1].sourceKey,'manual:test');
+});
+test('safe-to-spend turns green at 500 per day and red below; escapes transaction names',()=>{
+ const salary={amount:10500,date:'2026-10-01'};
+ assert.equal(spending(salary,[],'2026-10-11').daily,500);
+ assert.match(dashboard(salary,[],new URLSearchParams(),'2026-10-11'),/metric safe/);
+ assert.match(dashboard({...salary,amount:10499},[],new URLSearchParams(),'2026-10-11'),/metric unsafe/);
+ const rows=[{amount:1,date:'2026-10-11',payee:'<script>bad</script>',direction:'debit' as const,sourceKey:'manual:bad'}];
+ assert.match(dashboard(salary,rows,new URLSearchParams(),'2026-10-11'),/&lt;script&gt;bad&lt;\/script&gt;/);
+});
