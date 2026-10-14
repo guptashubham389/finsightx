@@ -77,7 +77,8 @@ test("pages through all Gmail results, gets each email, counts skips and caps pr
   const report = await importGmail("fake-test-token", async key => `hash:${key}`, async rows => { saved.push(...rows); return rows.length; }, request);
   assert.equal(report.totalEmailsFound, 8); assert.equal(report.rowsParsed, 7); assert.equal(report.rowsSkipped, 1);
   assert.equal(report.rowsInserted, 7); assert.equal(report.first5ParsedRows.length, 5);
-  assert.equal(report.first5ParsedRows[0].snippet, "Snippet 1");
+  assert.equal(report.first5ParsedRows[0].alertText, debit.replace("123456789012", "123456789011"));
+  assert.equal(JSON.stringify(saved).includes("Your UPI transaction reference number"), false);
   assert.equal(calls.filter(u => !u.pathname.endsWith("/messages")).length, 8);
   assert.deepEqual(Object.keys(saved[0]).sort(), ["amount", "date", "direction", "payee", "sourceKey"]);
   assert.equal(JSON.stringify(saved).includes("Snippet"), false);
@@ -175,11 +176,26 @@ test("OAuth requests exactly readonly, excludes existing scopes and protects sta
   assert.equal(await verify("test-secret", `${state}tampered`), null);
   assert.equal(await verify("test-secret", await sign("test-secret", { purpose: "gmail-oauth", expires: Date.now() - 100 })), null);
 });
-test("proof HTML escapes snippets and payees and preserves exact JSON output", () => {
+test("proof HTML escapes original alert text and payees and preserves exact JSON output", () => {
   const report = { query: GMAIL_QUERY, totalEmailsFound: 1, rowsParsed: 1, rowsSkipped: 0, rowsInserted: 1, duplicateRowsNotInserted: 0,
-    first5ParsedRows: [{ emailDate: "today", snippet: '<script>alert("bad")</script>', row: { date: "2026-10-08", amount: 10, direction: "debit" as const, payee: "<img src=x>" } }] };
+    first5ParsedRows: [{ emailDate: "today", alertText: '<script>alert("bad")</script>', row: { date: "2026-10-08", amount: 10, direction: "debit" as const, payee: "<img src=x>" } }] };
   const html = reportPage(report);
   assert.equal(html.includes('<script>alert("bad")</script>'), false);
   assert.ok(html.includes("&lt;script&gt;"));
   assert.ok(html.includes('id="import-output"'));
+});
+
+
+test("only UPI alerts become saved rows; full original text stays in the temporary comparison", async () => {
+ const fullText = debit + "\nA made-up footer that is missing from the Gmail snippet.";
+ const fixtures = [message('upi', fullText), message('other', 'INR 100 debited from account **1234 on 08-10-26 to TEST SHOP.')];
+ const saved: unknown[] = [];
+ const report = await importGmail('invented', async key => key, async rows => {saved.push(...rows);return rows.length}, async input => {
+  const url=new URL(String(input));
+  return Response.json(url.pathname.endsWith('/messages') ? {messages:fixtures.map(({id})=>({id}))} : fixtures.find(m=>url.pathname.endsWith('/'+m.id)));
+ });
+ assert.equal(report.totalEmailsFound,2);assert.equal(report.rowsParsed,1);assert.equal(report.rowsSkipped,1);
+ assert.equal(report.first5ParsedRows[0].alertText,fullText);
+ assert.equal(JSON.stringify(saved).includes('footer'),false);
+ assert.match(reportPage(report),/Showing 1 of 1 parsed rows/);
 });

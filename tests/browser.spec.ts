@@ -24,12 +24,12 @@ test("import report shows comparison table and JSON with the same exact values",
     query: GMAIL_QUERY, totalEmailsFound: 6, rowsParsed: 5, rowsSkipped: 1,
     rowsInserted: 5, duplicateRowsNotInserted: 0,
     first5ParsedRows: Array.from({ length: 5 }, (_, i) => ({
-      emailDate: "Thu, 08 Oct 2026 12:00:00 +0530", snippet: `Invented alert ${i + 1}`,
+      emailDate: "Thu, 08 Oct 2026 12:00:00 +0530", alertText: `Invented alert ${i + 1}`,
       row: { date: "2026-10-08", amount: 100 + i, direction: "debit" as const, payee: `Test shop ${i + 1}` },
     })),
   };
   await page.setContent(reportPage(report));
-  await expect(page.locator("tbody tr")).toHaveCount(5);
+  await expect(page.getByRole("article")).toHaveCount(5);
   await expect(page.locator("#import-output")).toHaveText(JSON.stringify(report, null, 2));
   expect(JSON.parse(await page.locator("#import-output").innerText())).toEqual(report);
   await page.setViewportSize({ width: 390, height: 844 });

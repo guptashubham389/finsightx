@@ -1,14 +1,14 @@
-import { emailHeader, parseMessage, type GmailMessage, type LedgerRow } from "./gmailParser";
+import { emailHeader, messageText, parseMessage, type GmailMessage, type LedgerRow } from "./gmailParser";
 
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
-export const GMAIL_QUERY = "from:alerts@hdfcbank.bank.in newer_than:90d";
+export const GMAIL_QUERY = "from:alerts@hdfcbank.bank.in newer_than:6m UPI";
 export type StoredRow = LedgerRow & { sourceKey: string };
 export type GmailTiming = { sleep?: (milliseconds: number) => Promise<void>; random?: () => number };
 const sleep = (milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds));
 export type ImportReport = {
   query: string; totalEmailsFound: number; rowsParsed: number; rowsSkipped: number;
   rowsInserted: number; duplicateRowsNotInserted: number;
-  first5ParsedRows: { emailDate: string; snippet: string; row: LedgerRow }[];
+  first5ParsedRows: { emailDate: string; alertText: string; row: LedgerRow }[];
 };
 
 const ERROR_REASONS = new Set([
@@ -120,7 +120,8 @@ export async function importGmail(
     }
     const rows: StoredRow[] = [];
     for (const message of messages) {
-      const parsed = parseMessage(message);
+      const alertText = messageText(message);
+      const parsed = alertText && /\bUPI\b/i.test(alertText) ? parseMessage(message) : null;
       if (!parsed) { report.rowsSkipped++; continue; }
       report.rowsParsed++;
       // UPI reference prevents two separate alert emails counting the same transaction twice.
@@ -132,7 +133,7 @@ export async function importGmail(
         report.first5ParsedRows.push({
           emailDate: emailHeader(message, "date") || (message.internalDate && Number.isFinite(Number(message.internalDate))
             ? new Date(Number(message.internalDate)).toISOString() : "Not supplied by Gmail"),
-          snippet: message.snippet ?? "", row: parsed.row,
+          alertText: alertText!, row: parsed.row,
         });
       }
     }

@@ -22,22 +22,22 @@ It does not request identity scopes, combine previously granted scopes, or reque
 
 ## What the import does
 
-- Calls `users.messages.list` with `q="from:alerts@hdfcbank.bank.in newer_than:90d"` and follows every `nextPageToken`.
+- Calls `users.messages.list` with `q="from:alerts@hdfcbank.bank.in newer_than:6m UPI"` and follows every `nextPageToken`.
 - Counts the actual unique message IDs, rather than Google's result-size estimate.
 - Fetches every result with `users.messages.get`, `format=full`.
 - Uses the Gmail profile endpoint under the same read-only permission to isolate each account's ledger. The account address is converted into a secret-keyed hash and is not saved.
 - Decodes plain text or HTML and parses explicit transaction fields. It never uses the subject or snippet to guess a transaction. Unsupported formats, missing payees, conflicting transactions, invalid dates, or unclear amounts are skipped and counted.
 - Saves only ledger rows: transaction date, amount in rupees, debit/credit, merchant/payee, and hashed account/source keys needed for private access and duplicate prevention. Convex also adds its normal document ID and creation time.
 - Prevents repeats by UPI reference where present, otherwise by Gmail message ID. Distinct emails without a common transaction reference cannot be reliably identified as duplicates and are not guessed to be the same transaction.
-- Does not save bodies, subjects, snippets, OAuth codes, access tokens, refresh tokens, or import reports. There are no logs of email contents or credentials.
+- Does not save original alert text, bodies, subjects, snippets, OAuth codes, access tokens, refresh tokens, or import reports. There are no logs of email contents or credentials.
 - After the import, enter monthly salary and salary date to see salary minus recorded spending and upcoming bills for the current salary period. Gmail credits are not added again as salary.
 - Manual transactions save date, amount, payee, type and optional note. Matching Gmail and manual spending is counted once when date, amount and payee match.
 
 ## Checking the real import
 
-After connection, the app shows the total emails found, parsed rows, skipped rows, new rows saved and duplicates. The first five parsed rows appear next to the email's date and Gmail snippet. The page also contains the exact JSON output under **Exact import output**.
+After connection, the app shows the total emails found, parsed rows, skipped rows, new rows saved and duplicates. The first five parsed rows appear next to the email date and the full decoded original alert text, laid out side by side at phone width. If fewer than five rows parse, all of them are shown with the count. Only alert bodies containing UPI are eligible. The page also contains the exact JSON output under **Exact import output**.
 
-Copy that JSON into the chat for verbatim review. The snippet proof is only in the one-time response, with caching disabled; it is not in the database and cannot be retrieved later by the assistant. Reconnect to generate a new comparison report. Reloading the OAuth callback cannot repeat the import because Google authorization codes can only be exchanged once.
+Compare the original alert text and each parsed date, amount, spent/received direction and payee on your phone. The original-text proof is only in the one-time response, with caching disabled; it is not in the database and cannot be retrieved later by the assistant. Reconnect to generate a new comparison report. Reloading the OAuth callback cannot repeat the import because Google authorization codes can only be exchanged once.
 
 The **View saved ledger** link works after closing and reopening the page in the same browser, using a signed, secure, HTTP-only cookie valid for 30 days. After expiry, reconnecting the same Google account restores access. A different Google account gets a separate ledger. Changing the Google client secret changes the hashed account keys; keep it stable for this development implementation.
 

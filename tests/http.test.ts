@@ -39,7 +39,7 @@ test("callback imports, saves only parsed rows, and returns exact temporary proo
     if (url.pathname.endsWith("/messages")) return Response.json({ messages: [{ id: "invented-id" }] });
     return Response.json({ id: "invented-id", snippet: "Invented comparison snippet", payload: {
       mimeType: "text/plain", headers: [{ name: "From", value: "alerts@hdfcbank.bank.in" }, { name: "Date", value: "Thu, 08 Oct 2026 12:00:00 +0530" }, { name: "Subject", value: "PRIVATE SUBJECT MUST NOT BE SAVED" }],
-      body: { data: Buffer.from("INR 100 debited from account **1234 on 08-10-26 to TEST SHOP.").toString("base64url") },
+      body: { data: Buffer.from("INR 100 debited from account **1234 on 08-10-26 to TEST SHOP. UPI Ref: 123456789012.").toString("base64url") },
     } });
   };
   try {
@@ -50,7 +50,7 @@ test("callback imports, saves only parsed rows, and returns exact temporary proo
     const html = await response.text();
     const proof = JSON.parse(decodeHTML(html.match(/<pre id="import-output">([\s\S]*?)<\/pre>/)![1]));
     assert.equal(proof.totalEmailsFound, 1); assert.equal(proof.rowsParsed, 1); assert.equal(proof.rowsSkipped, 0);
-    assert.equal(proof.first5ParsedRows[0].snippet, "Invented comparison snippet");
+    assert.equal(proof.first5ParsedRows[0].alertText, "INR 100 debited from account **1234 on 08-10-26 to TEST SHOP. UPI Ref: 123456789012.");
     assert.deepEqual(proof.first5ParsedRows[0].row, { date: "2026-10-08", amount: 100, direction: "debit", payee: "TEST SHOP" });
     const persisted = JSON.stringify(writes);
     for (const forbidden of ["PRIVATE SUBJECT", "snippet", "invented-token", "invented@example.com", "**1234", "headers", "body"]) assert.equal(persisted.includes(forbidden), false);
